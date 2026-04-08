@@ -6,9 +6,6 @@ import {
 } from './ReactNativeFilesystem.types';
 
 declare class ReactNativeFilesystemModule extends NativeModule<ReactNativeFilesystemModuleEvents> {
-  PI: number;
-  hello(): string;
-  setValueAsync(value: string): Promise<void>;
   getDocumentsDirectory(): Promise<string>;
   exists(path: string): Promise<boolean>;
   readFile(path: string): Promise<string>;

@@ -28,28 +28,6 @@ class ReactNativeFilesystemModule : Module() {
     // The module will be accessible from `requireNativeModule('ReactNativeFilesystem')` in JavaScript.
     Name("ReactNativeFilesystem")
 
-    // Defines constant property on the module.
-    Constant("PI") {
-      Math.PI
-    }
-
-    // Defines event names that the module can send to JavaScript.
-    Events("onChange")
-
-    // Defines a JavaScript synchronous function that runs the native code on the JavaScript thread.
-    Function("hello") {
-      "Hello world! 👋"
-    }
-
-    // Defines a JavaScript function that always returns a Promise and whose native code
-    // is by default dispatched on the different thread than the JavaScript runtime runs on.
-    AsyncFunction("setValueAsync") { value: String ->
-      // Send an event to JavaScript.
-      sendEvent("onChange", mapOf(
-        "value" to value
-      ))
-    }
-
     AsyncFunction("getDocumentsDirectory") {
       appContext.persistentFilesDirectory.absolutePath
     }

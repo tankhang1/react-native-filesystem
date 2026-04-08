@@ -5,12 +5,7 @@ const { act } = TestRenderer;
 
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockUseEvent: any = jest.fn(() => ({ value: 'Hello from native event' }));
-
 const mockNativeModule: any = {
-  PI: Math.PI,
-  hello: jest.fn(() => 'Hello world! 👋'),
-  setValueAsync: (jest.fn() as any).mockResolvedValue(undefined),
   getDocumentsDirectory: (jest.fn() as any).mockResolvedValue('/data/user/0/example/files'),
   exists: (jest.fn() as any).mockResolvedValue(true),
   readFile: (jest.fn() as any).mockResolvedValue('file contents from native'),
@@ -32,10 +27,6 @@ const mockNativeModule: any = {
   move: (jest.fn() as any).mockResolvedValue(undefined),
   copy: (jest.fn() as any).mockResolvedValue(undefined),
 };
-
-jest.mock('expo', () => ({
-  useEvent: (...args: any[]) => mockUseEvent(...args),
-}));
 
 jest.mock('react-native', () => {
   const React = require('react');
@@ -117,9 +108,6 @@ function flattenText(children: React.ReactNode): string {
 describe('example app mobile harness', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseEvent.mockReturnValue({ value: 'Hello from native event' });
-    mockNativeModule.hello.mockReturnValue('Hello world! 👋');
-    mockNativeModule.setValueAsync.mockResolvedValue(undefined);
     mockNativeModule.getDocumentsDirectory.mockResolvedValue('/data/user/0/example/files');
     mockNativeModule.exists.mockResolvedValue(true);
     mockNativeModule.writeFile.mockResolvedValue(undefined);
@@ -140,7 +128,7 @@ describe('example app mobile harness', () => {
     });
   });
 
-  it('renders native values and drives filesystem actions from the UI', async () => {
+  it('drives filesystem actions from the UI', async () => {
     let renderer: any;
 
     await act(async () => {
@@ -152,14 +140,6 @@ describe('example app mobile harness', () => {
     const findButton = (title: string) =>
       root.findAllByType('Button').find((button: any) => button.props.title === title);
 
-    const allText = root
-      .findAllByType('Text')
-      .map((node: any) => flattenText(node.props.children))
-      .join('\n');
-
-    expect(allText).toContain(String(Math.PI));
-    expect(allText).toContain('Hello world! 👋');
-    expect(flattenText(findByTestId('event-value').props.children)).toBe('Hello from native event');
     expect(mockNativeModule.getDocumentsDirectory).toHaveBeenCalled();
     expect(flattenText(findByTestId('documents-directory').props.children)).toContain(
       '/data/user/0/example/files',

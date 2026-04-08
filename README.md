@@ -162,32 +162,6 @@ const invoicePath = await resolveReactNativeFilesystemFilePath(
 
 ## API Reference
 
-### `PI`
-
-Exposes the native value of `Math.PI`.
-
-```ts
-console.log(ReactNativeFilesystem.PI);
-```
-
-### `hello()`
-
-Returns a simple native greeting string.
-
-```ts
-const message = ReactNativeFilesystem.hello();
-console.log(message);
-// Hello world! 👋
-```
-
-### `setValueAsync(value)`
-
-Sends a value to native code and emits the `onChange` event.
-
-```ts
-await ReactNativeFilesystem.setValueAsync('Updated from JS');
-```
-
 ### `getDocumentsDirectory()`
 
 Returns the app documents directory path.
@@ -474,29 +448,6 @@ Use this when:
 
 - Android should save to Downloads
 - iOS should prompt the user with the Files picker
-
-## Events
-
-Use Expo's `useEvent` helper to subscribe to `onChange`.
-
-```tsx
-import { useEvent } from 'expo';
-import ReactNativeFilesystem from 'react-native-filesystem';
-
-function Example() {
-  const payload = useEvent(ReactNativeFilesystem, 'onChange');
-
-  return <Text>{payload?.value ?? 'No value yet'}</Text>;
-}
-```
-
-Event payload:
-
-```ts
-type ChangeEventPayload = {
-  value: string;
-};
-```
 
 ## Native View
 

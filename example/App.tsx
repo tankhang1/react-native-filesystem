@@ -1,4 +1,3 @@
-import { useEvent } from 'expo';
 import { useEffect, useState } from 'react';
 import ReactNativeFilesystem, {
   joinReactNativeFilesystemPath,
@@ -36,7 +35,6 @@ function createCustomDirectory(path: string): ReactNativeFilesystemDirectoryDesc
 }
 
 export default function App() {
-  const onChangePayload = useEvent(ReactNativeFilesystem, 'onChange');
   const [filePath, setFilePath] = useState(FALLBACK_FILE_PATH);
   const [directoryPath, setDirectoryPath] = useState(FALLBACK_DIRECTORY_PATH);
   const [contents, setContents] = useState(DEFAULT_CONTENTS);
@@ -97,23 +95,6 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.container}>
         <Text style={styles.header}>Module API Example</Text>
-        <Group name="Constants">
-          <Text>{ReactNativeFilesystem.PI}</Text>
-        </Group>
-        <Group name="Functions">
-          <Text>{ReactNativeFilesystem.hello()}</Text>
-        </Group>
-        <Group name="Async functions">
-          <Button
-            title="Set value"
-            onPress={async () => {
-              await ReactNativeFilesystem.setValueAsync('Hello from JS!');
-            }}
-          />
-        </Group>
-        <Group name="Events">
-          <Text testID="event-value">{onChangePayload?.value ?? 'none'}</Text>
-        </Group>
         <Group name="Filesystem Harness">
           <Text testID="documents-directory">Documents directory: {documentsDirectory}</Text>
 

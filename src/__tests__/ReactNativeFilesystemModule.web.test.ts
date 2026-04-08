@@ -27,17 +27,6 @@ const unsupportedMessage =
 const moduleInstance = ReactNativeFilesystemModule as any;
 
 describe("ReactNativeFilesystemModule.web", () => {
-  it("exposes the legacy template API", async () => {
-    expect(moduleInstance.PI).toBe(Math.PI);
-    expect(moduleInstance.hello()).toBe("Hello world! 👋");
-
-    const emitSpy = jest.spyOn(moduleInstance, "emit");
-
-    await moduleInstance.setValueAsync("hello");
-
-    expect(emitSpy).toHaveBeenCalledWith("onChange", { value: "hello" });
-  });
-
   it("rejects exists on web", async () => {
     await expect(moduleInstance.exists("/tmp/file.txt")).rejects.toThrow(
       unsupportedMessage,

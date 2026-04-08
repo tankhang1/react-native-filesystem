@@ -13,13 +13,7 @@ export type OnLoadEventPayload = {
   url: string;
 };
 
-export type ReactNativeFilesystemModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
-};
-
-export type ChangeEventPayload = {
-  value: string;
-};
+export type ReactNativeFilesystemModuleEvents = Record<string, never>;
 
 export enum ReactNativeFilesystemDirectoryKind {
   Documents = 'documents',

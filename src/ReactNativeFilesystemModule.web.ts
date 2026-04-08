@@ -12,15 +12,8 @@ function unsupported(): never {
 }
 
 class ReactNativeFilesystemModule extends NativeModule<ReactNativeFilesystemModuleEvents> {
-  PI = Math.PI;
-  async setValueAsync(value: string): Promise<void> {
-    this.emit('onChange', { value });
-  }
   async getDocumentsDirectory(): Promise<string> {
     unsupported();
-  }
-  hello() {
-    return 'Hello world! 👋';
   }
   async exists(_path: string): Promise<boolean> {
     unsupported();

@@ -2,9 +2,6 @@ import { expect, jest, test } from '@jest/globals';
 import { requireNativeModule } from 'expo';
 
 const mockedNativeModule = {
-  PI: Math.PI,
-  hello: jest.fn(() => 'Hello world! 👋'),
-  setValueAsync: jest.fn(),
   getDocumentsDirectory: jest.fn(),
   exists: jest.fn(),
   readFile: jest.fn(),
