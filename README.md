@@ -127,6 +127,18 @@ Run linting:
 npm run lint
 ```
 
+Run the package tests:
+
+```bash
+npm test
+```
+
+Run the example app test harness:
+
+```bash
+npm run test:example
+```
+
 Open the example app:
 
 ```bash
