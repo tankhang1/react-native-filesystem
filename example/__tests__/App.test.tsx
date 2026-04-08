@@ -11,9 +11,13 @@ const mockNativeModule: any = {
   PI: Math.PI,
   hello: jest.fn(() => 'Hello world! 👋'),
   setValueAsync: (jest.fn() as any).mockResolvedValue(undefined),
+  getDocumentsDirectory: (jest.fn() as any).mockResolvedValue('/data/user/0/example/files'),
   exists: (jest.fn() as any).mockResolvedValue(true),
   readFile: (jest.fn() as any).mockResolvedValue('file contents from native'),
   writeFile: (jest.fn() as any).mockResolvedValue(undefined),
+  writeFileToDownloads: (jest.fn() as any).mockResolvedValue(
+    'content://downloads/public_downloads/1',
+  ),
   deleteFile: (jest.fn() as any).mockResolvedValue(undefined),
   mkdir: (jest.fn() as any).mockResolvedValue(undefined),
   readdir: (jest.fn() as any).mockResolvedValue(['alpha.txt', 'beta.txt']),
@@ -44,6 +48,9 @@ jest.mock('react-native', () => {
   return {
     Button: ({ title, onPress }: { title: string; onPress: () => void }) =>
       React.createElement('Button', { title, onPress }),
+    Platform: {
+      OS: 'android',
+    },
     SafeAreaView: createComponent('SafeAreaView'),
     ScrollView: createComponent('ScrollView'),
     StyleSheet: {
@@ -57,11 +64,39 @@ jest.mock('react-native', () => {
 
 jest.mock('react-native-filesystem', () => {
   const React = require('react');
+  const DOCUMENTS_KIND = 'documents';
+  const CUSTOM_KIND = 'custom';
+
+  const joinReactNativeFilesystemPath = (...segments: string[]) =>
+    segments
+      .filter(Boolean)
+      .map((segment, index) =>
+        index === 0 ? segment.replace(/\/+$/, '') : segment.replace(/^\/+|\/+$/g, '')
+      )
+      .join('/');
 
   return {
     __esModule: true,
     default: mockNativeModule,
+    ReactNativeFilesystemDirectoryKind: {
+      Documents: DOCUMENTS_KIND,
+      Custom: CUSTOM_KIND,
+    },
     ReactNativeFilesystemView: () => React.createElement(React.Fragment, null),
+    joinReactNativeFilesystemPath,
+    resolveReactNativeFilesystemDirectory: async (directory: any) => {
+      if (directory.kind === DOCUMENTS_KIND) {
+        return mockNativeModule.getDocumentsDirectory();
+      }
+      return directory.path.replace(/\/+$/, '');
+    },
+    resolveReactNativeFilesystemFilePath: async (directory: any, filename: string) => {
+      const basePath =
+        directory.kind === DOCUMENTS_KIND
+          ? await mockNativeModule.getDocumentsDirectory()
+          : directory.path;
+      return joinReactNativeFilesystemPath(basePath, filename);
+    },
   };
 });
 
@@ -85,8 +120,12 @@ describe('example app mobile harness', () => {
     mockUseEvent.mockReturnValue({ value: 'Hello from native event' });
     mockNativeModule.hello.mockReturnValue('Hello world! 👋');
     mockNativeModule.setValueAsync.mockResolvedValue(undefined);
+    mockNativeModule.getDocumentsDirectory.mockResolvedValue('/data/user/0/example/files');
     mockNativeModule.exists.mockResolvedValue(true);
     mockNativeModule.writeFile.mockResolvedValue(undefined);
+    mockNativeModule.writeFileToDownloads.mockResolvedValue(
+      'content://downloads/public_downloads/1',
+    );
     mockNativeModule.readFile.mockResolvedValue('file contents from native');
     mockNativeModule.deleteFile.mockResolvedValue(undefined);
     mockNativeModule.mkdir.mockResolvedValue(undefined);
@@ -121,6 +160,32 @@ describe('example app mobile harness', () => {
     expect(allText).toContain(String(Math.PI));
     expect(allText).toContain('Hello world! 👋');
     expect(flattenText(findByTestId('event-value').props.children)).toBe('Hello from native event');
+    expect(mockNativeModule.getDocumentsDirectory).toHaveBeenCalled();
+    expect(flattenText(findByTestId('documents-directory').props.children)).toContain(
+      '/data/user/0/example/files',
+    );
+
+    await act(async () => {
+      findButton('Use documents directory')!.props.onPress();
+    });
+    expect(flattenText(findByTestId('status-text').props.children)).toContain(
+      'documentsDirectory: applied',
+    );
+    expect(findByTestId('file-path-input').props.value).toBe('/data/user/0/example/files/example.txt');
+    expect(findByTestId('directory-path-input').props.value).toBe('/data/user/0/example/files');
+
+    await act(async () => {
+      findButton('Use custom directory')!.props.onPress();
+    });
+    expect(flattenText(findByTestId('status-text').props.children)).toContain(
+      'customDirectory: applied',
+    );
+    expect(findByTestId('file-path-input').props.value).toBe(
+      '/data/user/0/example/files/custom/example.txt',
+    );
+    expect(findByTestId('directory-path-input').props.value).toBe(
+      '/data/user/0/example/files/custom',
+    );
 
     await act(async () => {
       findByTestId('file-path-input').props.onChangeText('/tmp/custom.txt');
@@ -174,5 +239,20 @@ describe('example app mobile harness', () => {
       findButton('Delete file')!.props.onPress();
     });
     expect(mockNativeModule.deleteFile).toHaveBeenCalledWith('/tmp/custom.txt');
+
+    await act(async () => {
+      findButton('Write to downloads')!.props.onPress();
+    });
+    expect(mockNativeModule.writeFileToDownloads).toHaveBeenCalledWith(
+      'react-native-filesystem-example.txt',
+      'updated file contents',
+      'text/plain',
+    );
+    expect(flattenText(findByTestId('downloads-result').props.children)).toContain(
+      'content://downloads/public_downloads/1',
+    );
+    expect(findByTestId('file-path-input').props.value).toBe(
+      'content://downloads/public_downloads/1',
+    );
   });
 });

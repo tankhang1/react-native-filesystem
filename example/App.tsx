@@ -1,8 +1,16 @@
 import { useEvent } from 'expo';
-import { useState } from 'react';
-import ReactNativeFilesystem, { ReactNativeFilesystemView } from 'react-native-filesystem';
+import { useEffect, useState } from 'react';
+import ReactNativeFilesystem, {
+  joinReactNativeFilesystemPath,
+  ReactNativeFilesystemDirectoryKind,
+  type ReactNativeFilesystemDirectoryDescriptor,
+  ReactNativeFilesystemView,
+  resolveReactNativeFilesystemDirectory,
+  resolveReactNativeFilesystemFilePath,
+} from 'react-native-filesystem';
 import {
   Button,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -11,20 +19,66 @@ import {
   View,
 } from 'react-native';
 
-const DEFAULT_FILE_PATH = '/tmp/react-native-filesystem/example.txt';
-const DEFAULT_DIRECTORY_PATH = '/tmp/react-native-filesystem';
+const FALLBACK_FILE_PATH = '/tmp/react-native-filesystem/example.txt';
+const FALLBACK_DIRECTORY_PATH = '/tmp/react-native-filesystem';
 const DEFAULT_CONTENTS = 'Hello from React Native Filesystem';
+const EXAMPLE_FILENAME = 'example.txt';
+
+const DOCUMENTS_DIRECTORY: ReactNativeFilesystemDirectoryDescriptor = {
+  kind: ReactNativeFilesystemDirectoryKind.Documents,
+};
+
+function createCustomDirectory(path: string): ReactNativeFilesystemDirectoryDescriptor {
+  return {
+    kind: ReactNativeFilesystemDirectoryKind.Custom,
+    path,
+  };
+}
 
 export default function App() {
   const onChangePayload = useEvent(ReactNativeFilesystem, 'onChange');
-  const [filePath, setFilePath] = useState(DEFAULT_FILE_PATH);
-  const [directoryPath, setDirectoryPath] = useState(DEFAULT_DIRECTORY_PATH);
+  const [filePath, setFilePath] = useState(FALLBACK_FILE_PATH);
+  const [directoryPath, setDirectoryPath] = useState(FALLBACK_DIRECTORY_PATH);
   const [contents, setContents] = useState(DEFAULT_CONTENTS);
   const [status, setStatus] = useState('Ready');
   const [existsResult, setExistsResult] = useState('unknown');
   const [readResult, setReadResult] = useState('none');
   const [directoryEntries, setDirectoryEntries] = useState<string[]>([]);
   const [statResult, setStatResult] = useState('not loaded');
+  const [documentsDirectory, setDocumentsDirectory] = useState('not loaded');
+  const [downloadsResult, setDownloadsResult] = useState('none');
+  const saveToFilesButtonTitle =
+    Platform.OS === 'android' ? 'Write to downloads' : 'Save to Files';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    Promise.all([
+      resolveReactNativeFilesystemDirectory(DOCUMENTS_DIRECTORY),
+      resolveReactNativeFilesystemFilePath(DOCUMENTS_DIRECTORY, EXAMPLE_FILENAME),
+    ])
+      .then(([directoryPath, filePath]) => {
+        if (!isMounted) {
+          return;
+        }
+
+        setDocumentsDirectory(directoryPath);
+        setDirectoryPath(directoryPath);
+        setFilePath(filePath);
+      })
+      .catch((error) => {
+        if (!isMounted) {
+          return;
+        }
+
+        const message = error instanceof Error ? error.message : String(error);
+        setDocumentsDirectory(`Unavailable: ${message}`);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function runAction(
     actionName: string,
@@ -61,6 +115,8 @@ export default function App() {
           <Text testID="event-value">{onChangePayload?.value ?? 'none'}</Text>
         </Group>
         <Group name="Filesystem Harness">
+          <Text testID="documents-directory">Documents directory: {documentsDirectory}</Text>
+
           <Text style={styles.label}>File path</Text>
           <TextInput
             testID="file-path-input"
@@ -93,6 +149,42 @@ export default function App() {
           />
 
           <View style={styles.buttonGroup}>
+            <Button
+              title="Use documents directory"
+              onPress={async () => {
+                if (!documentsDirectory || documentsDirectory.startsWith('Unavailable:')) {
+                  setStatus('documentsDirectory: unavailable');
+                  return;
+                }
+
+                const filePath = await resolveReactNativeFilesystemFilePath(
+                  DOCUMENTS_DIRECTORY,
+                  EXAMPLE_FILENAME,
+                );
+                setDirectoryPath(documentsDirectory);
+                setFilePath(filePath);
+                setStatus('documentsDirectory: applied');
+              }}
+            />
+            <Button
+              title="Use custom directory"
+              onPress={() => {
+                const customDirectoryPath = joinReactNativeFilesystemPath(
+                  documentsDirectory.startsWith('Unavailable:')
+                    ? FALLBACK_DIRECTORY_PATH
+                    : documentsDirectory,
+                  'custom',
+                );
+                const customDirectory = createCustomDirectory(
+                  customDirectoryPath,
+                );
+                setDirectoryPath(customDirectoryPath);
+                setFilePath(
+                  joinReactNativeFilesystemPath(customDirectoryPath, EXAMPLE_FILENAME),
+                );
+                setStatus(`customDirectory: applied (${customDirectory.kind})`);
+              }}
+            />
             <Button
               title="Exists"
               onPress={() =>
@@ -153,9 +245,24 @@ export default function App() {
                 })
               }
             />
+            <Button
+              title={saveToFilesButtonTitle}
+              onPress={() =>
+                runAction('writeFileToDownloads', async () => {
+                  const result = await ReactNativeFilesystem.writeFileToDownloads(
+                    'react-native-filesystem-example.txt',
+                    contents,
+                    'text/plain',
+                  );
+                  setDownloadsResult(result);
+                  setFilePath(result);
+                })
+              }
+            />
           </View>
 
           <Text testID="status-text">Status: {status}</Text>
+          <Text testID="downloads-result">Downloads result: {downloadsResult}</Text>
           <Text testID="exists-result">Exists: {existsResult}</Text>
           <Text testID="read-result">Read result: {readResult}</Text>
           <Text testID="readdir-result">
