@@ -1,6 +1,15 @@
 import { registerWebModule, NativeModule } from 'expo';
 
-import { ReactNativeFilesystemModuleEvents } from './ReactNativeFilesystem.types';
+import {
+  ReactNativeFilesystemModuleEvents,
+  ReactNativeFilesystemStat,
+} from './ReactNativeFilesystem.types';
+
+function unsupported(): never {
+  throw new Error(
+    'react-native-filesystem does not currently support direct local filesystem access on web.'
+  );
+}
 
 class ReactNativeFilesystemModule extends NativeModule<ReactNativeFilesystemModuleEvents> {
   PI = Math.PI;
@@ -9,6 +18,33 @@ class ReactNativeFilesystemModule extends NativeModule<ReactNativeFilesystemModu
   }
   hello() {
     return 'Hello world! 👋';
+  }
+  async exists(_path: string): Promise<boolean> {
+    unsupported();
+  }
+  async readFile(_path: string): Promise<string> {
+    unsupported();
+  }
+  async writeFile(_path: string, _contents: string): Promise<void> {
+    unsupported();
+  }
+  async deleteFile(_path: string): Promise<void> {
+    unsupported();
+  }
+  async mkdir(_path: string): Promise<void> {
+    unsupported();
+  }
+  async readdir(_path: string): Promise<string[]> {
+    unsupported();
+  }
+  async stat(_path: string): Promise<ReactNativeFilesystemStat> {
+    unsupported();
+  }
+  async move(_from: string, _to: string): Promise<void> {
+    unsupported();
+  }
+  async copy(_from: string, _to: string): Promise<void> {
+    unsupported();
   }
 }
 

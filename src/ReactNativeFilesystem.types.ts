@@ -1,5 +1,14 @@
 import type { StyleProp, ViewStyle } from 'react-native';
 
+export type ReactNativeFilesystemStat = {
+  path: string;
+  exists: boolean;
+  isFile: boolean;
+  isDirectory: boolean;
+  size: number;
+  modificationTime: number | null;
+};
+
 export type OnLoadEventPayload = {
   url: string;
 };
