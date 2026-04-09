@@ -42,6 +42,7 @@ jest.mock('react-native', () => {
     Platform: {
       OS: 'android',
     },
+    processColor: (color: string) => color,
     SafeAreaView: createComponent('SafeAreaView'),
     ScrollView: createComponent('ScrollView'),
     StyleSheet: {
@@ -50,6 +51,59 @@ jest.mock('react-native', () => {
     Text: createComponent('Text'),
     TextInput: createComponent('TextInput'),
     View: createComponent('View'),
+  };
+});
+
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+
+  return {
+    GestureHandlerRootView: ({ children, ...props }: Record<string, unknown>) =>
+      React.createElement('GestureHandlerRootView', props, children),
+  };
+});
+
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+
+  return {
+    NavigationContainer: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+  };
+});
+
+jest.mock('@react-navigation/drawer', () => {
+  const React = require('react');
+
+  const Screen = (props: any) => React.createElement('DrawerScreen', props);
+  const Navigator = ({
+    children,
+    initialRouteName,
+  }: {
+    children: React.ReactNode;
+    initialRouteName?: string;
+  }) => {
+    const screens = React.Children.toArray(children) as any[];
+    const activeScreen =
+      screens.find((screen) => screen.props.name === initialRouteName) ?? screens[0];
+
+    if (!activeScreen) {
+      return null;
+    }
+
+    if (typeof activeScreen.props.children === 'function') {
+      return activeScreen.props.children({});
+    }
+
+    const Component = activeScreen.props.component;
+    return Component ? React.createElement(Component) : null;
+  };
+
+  return {
+    createDrawerNavigator: () => ({
+      Navigator,
+      Screen,
+    }),
   };
 });
 
