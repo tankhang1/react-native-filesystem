@@ -1,5 +1,5 @@
 {
-  "name": "react-native-filesystem",
+  "name": "react-native-simple-fs",
   "version": "0.0.1",
   "description": "A cross-platform React Native filesystem module for reading, writing, and managing files on iOS and Android.",
   "main": "build/index.js",
@@ -22,13 +22,16 @@
     "react-native-filesystem",
     "ReactNativeFilesystem"
   ],
-  "repository": "https://github.com/tankhang1/react-native-filesystem",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tankhang1/react-native-simple-fs.git"
+  },
   "bugs": {
-    "url": "https://github.com/tankhang1/react-native-filesystem/issues"
+    "url": "https://github.com/tankhang1/react-native-simple-fs/issues"
   },
   "author": "Ethan <doank3442@gmail.com> (https://github.com/tankhang1)",
   "license": "MIT",
-  "homepage": "https://github.com/tankhang1/react-native-filesystem#readme",
+  "homepage": "https://www.npmjs.com/package/react-native-simple-fs",
   "dependencies": {},
   "devDependencies": {
     "@types/react": "~19.1.1",

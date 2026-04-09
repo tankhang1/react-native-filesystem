@@ -1,4 +1,4 @@
-# react-native-filesystem
+# react-native-simple-fs
 
 A cross-platform Expo module for reading, writing, and managing local files in React Native.
 
@@ -19,7 +19,7 @@ This package provides a native filesystem API for iOS and Android, plus typed he
 ## Installation
 
 ```bash
-npm install react-native-filesystem
+npm install react-native-simple-fs
 ```
 
 This package is built as an Expo module, so native linking should happen automatically during your iOS and Android builds.
@@ -49,7 +49,7 @@ Important: iOS does not offer a silent public Downloads location like Android. S
 import ReactNativeFilesystem, {
   ReactNativeFilesystemDirectoryKind,
   resolveReactNativeFilesystemFilePath,
-} from 'react-native-filesystem';
+} from 'react-native-simple-fs';
 
 async function quickStart() {
   const filePath = await resolveReactNativeFilesystemFilePath(
@@ -69,7 +69,7 @@ async function quickStart() {
 ## Import Styles
 
 ```ts
-import ReactNativeFilesystem from 'react-native-filesystem';
+import ReactNativeFilesystem from 'react-native-simple-fs';
 ```
 
 ```ts
@@ -78,7 +78,7 @@ import {
   joinReactNativeFilesystemPath,
   resolveReactNativeFilesystemDirectory,
   resolveReactNativeFilesystemFilePath,
-} from 'react-native-filesystem';
+} from 'react-native-simple-fs';
 ```
 
 ## Types
