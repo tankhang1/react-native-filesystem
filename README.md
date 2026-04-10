@@ -18,6 +18,33 @@ This package helps you:
 
 Package: https://www.npmjs.com/package/react-native-simple-fs
 
+## Compatibility
+
+### Can I use it with these React Native setups?
+
+- React Native New Architecture: yes
+- React Native old architecture: yes
+- React Native CLI app: yes, but it requires installing `expo` and setting up Expo Modules
+- bare React Native app: yes, as long as `expo` and Expo Modules are installed in the native app
+- Expo managed app: yes, but you must create a custom native build
+- Expo prebuild / `expo run:android`: yes
+- Expo prebuild / `expo run:ios`: yes
+- EAS Build: yes
+- Expo Go: no, because Expo Go cannot load this custom native module
+
+### Platform support
+
+- Android: supported
+- iOS: supported
+- Web: import is possible, but local filesystem methods are not supported and will throw
+
+### Notes
+
+- Android supports saving remote downloads directly into the public Downloads folder
+- iOS supports app storage downloads and the Files export flow, but not silent writing to a public Downloads folder
+- this package is built as an Expo Module, so non-Expo React Native apps must still include Expo Modules integration
+- if you use React Native CLI, install `expo` in your app before using this package
+
 ## Install
 
 ### Step 1: install the package
@@ -39,6 +66,14 @@ npx expo run:ios
 ```
 
 If you use EAS or your own CI builds, just make sure the next native build includes this package.
+
+Requirements:
+
+- `expo`
+- `react`
+- `react-native`
+
+This package declares them as peer dependencies, so your app must already include them.
 
 ## How It Works
 
