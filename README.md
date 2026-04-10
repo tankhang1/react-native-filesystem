@@ -20,9 +20,9 @@ Package: https://www.npmjs.com/package/react-native-simple-fs
 
 ## Demo
 
-<video src="./android.mov" controls muted playsinline width="360"></video>
+Watch the demo on YouTube:
 
-If the video player does not render in your viewer, open [android.mov](/Users/khang/Documents/Nexa/react-native-simple-fs/android.mov).
+https://youtube.com/shorts/1qx8jOYsjPg?si=Hxj6GSAsr2xWKAr2
 
 ## Compatibility
 
