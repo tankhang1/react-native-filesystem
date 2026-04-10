@@ -15,8 +15,20 @@ export type ReactNativeFilesystemDownloadResult = {
   statusCode: number;
 };
 
+export type ReactNativeFilesystemDownloadProgressEvent = {
+  bytesWritten: number;
+  contentLength: number | null;
+  destinationPath: string;
+  progress: number | null;
+  progressId: string | null;
+  url: string;
+};
+
 export type ReactNativeFilesystemDownloadOptions = {
   mimeType?: string;
+  onProgressIntervalMs?: number;
+  progressId?: string;
+  saveToDownloads?: boolean;
 };
 
 export const ReactNativeFilesystemCommonMimeTypes = {
@@ -40,7 +52,9 @@ export type OnLoadEventPayload = {
   url: string;
 };
 
-export type ReactNativeFilesystemModuleEvents = Record<string, never>;
+export type ReactNativeFilesystemModuleEvents = {
+  downloadProgress: (event: ReactNativeFilesystemDownloadProgressEvent) => void;
+};
 
 export enum ReactNativeFilesystemDirectoryKind {
   Documents = 'documents',

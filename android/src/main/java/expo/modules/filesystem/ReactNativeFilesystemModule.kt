@@ -14,11 +14,18 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.EnumSet
 
 class ReactNativeFilesystemModule : Module() {
+  private data class DownloadTarget(
+    val path: String,
+    val outputStream: OutputStream,
+    val cleanup: () -> Unit
+  )
+
   private val context
     get() = appContext.reactContext ?: throw Exceptions.AppContextLost()
 
@@ -30,6 +37,8 @@ class ReactNativeFilesystemModule : Module() {
     // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
     // The module will be accessible from `requireNativeModule('ReactNativeFilesystem')` in JavaScript.
     Name("ReactNativeFilesystem")
+
+    Events("downloadProgress")
 
     AsyncFunction("getDocumentsDirectory") {
       appContext.persistentFilesDirectory.absolutePath
@@ -70,8 +79,19 @@ class ReactNativeFilesystemModule : Module() {
     }
 
     AsyncFunction("downloadFile") { url: String, destinationPath: String, options: Map<String, Any>? ->
-      validateFileAccess(destinationPath, Permission.WRITE)
-      downloadFile(url, destinationPath, options?.get("mimeType") as? String)
+      val saveToDownloads = options?.get("saveToDownloads") as? Boolean ?: false
+      if (!saveToDownloads && !isContentUri(destinationPath)) {
+        validateFileAccess(destinationPath, Permission.WRITE)
+      }
+
+      downloadFile(
+        url = url,
+        destinationPath = destinationPath,
+        mimeType = options?.get("mimeType") as? String,
+        saveToDownloads = saveToDownloads,
+        progressId = options?.get("progressId") as? String,
+        onProgressIntervalMs = (options?.get("onProgressIntervalMs") as? Number)?.toLong() ?: 0L
+      )
     }
 
     AsyncFunction("writeFileToDownloads") { filename: String, contents: String, mimeType: String? ->
@@ -222,7 +242,14 @@ class ReactNativeFilesystemModule : Module() {
     )
   }
 
-  private fun downloadFile(url: String, destinationPath: String, mimeType: String?): Map<String, Any> {
+  private fun downloadFile(
+    url: String,
+    destinationPath: String,
+    mimeType: String?,
+    saveToDownloads: Boolean,
+    progressId: String?,
+    onProgressIntervalMs: Long
+  ): Map<String, Any> {
     val parsedUrl = try {
       URL(url)
     } catch (error: Exception) {
@@ -240,7 +267,7 @@ class ReactNativeFilesystemModule : Module() {
     connection.instanceFollowRedirects = true
     connection.connectTimeout = 15000
     connection.readTimeout = 30000
-    var destinationFile = File(destinationPath)
+    var downloadTarget: DownloadTarget? = null
 
     try {
       connection.connect()
@@ -250,17 +277,24 @@ class ReactNativeFilesystemModule : Module() {
         throw IOException("Download failed with HTTP $statusCode for URL: $url")
       }
 
-      destinationFile = resolveDownloadTarget(
+      val resolvedDestinationPath = resolveDownloadTargetPath(
         destinationPath = destinationPath,
         explicitMimeType = mimeType,
         suggestedFilename = connection.getHeaderField("Content-Disposition"),
-        responseMimeType = connection.contentType
+        responseMimeType = connection.contentType,
+        saveToDownloads = saveToDownloads
       )
-      destinationFile.parentFile?.mkdirs()
+      val contentLength = connection.contentLengthLong.takeIf { it >= 0L }
+      downloadTarget = openDownloadTarget(
+        resolvedDestinationPath = resolvedDestinationPath,
+        mimeType = mimeType ?: connection.contentType,
+        saveToDownloads = saveToDownloads
+      )
 
       var bytesWritten = 0L
+      var lastProgressEventAt = 0L
       connection.inputStream.use { inputStream ->
-        FileOutputStream(destinationFile).use { outputStream ->
+        downloadTarget.outputStream.use { outputStream ->
           val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
           while (true) {
             val bytesRead = inputStream.read(buffer)
@@ -270,35 +304,74 @@ class ReactNativeFilesystemModule : Module() {
 
             outputStream.write(buffer, 0, bytesRead)
             bytesWritten += bytesRead.toLong()
+
+            val now = System.currentTimeMillis()
+            val shouldEmitProgress =
+              onProgressIntervalMs <= 0L ||
+                now - lastProgressEventAt >= onProgressIntervalMs ||
+                (contentLength != null && bytesWritten >= contentLength)
+
+            if (shouldEmitProgress) {
+              emitDownloadProgress(
+                url = url,
+                destinationPath = downloadTarget.path,
+                progressId = progressId,
+                bytesWritten = bytesWritten,
+                contentLength = contentLength
+              )
+              lastProgressEventAt = now
+            }
           }
           outputStream.flush()
         }
       }
 
+      if (bytesWritten == 0L || contentLength == null || bytesWritten < contentLength) {
+        emitDownloadProgress(
+          url = url,
+          destinationPath = downloadTarget.path,
+          progressId = progressId,
+          bytesWritten = bytesWritten,
+          contentLength = contentLength
+        )
+      }
+
       return mapOf(
-        "path" to destinationFile.absolutePath,
+        "path" to downloadTarget.path,
         "bytesWritten" to bytesWritten,
         "statusCode" to statusCode
       )
     } catch (error: Exception) {
-      if (destinationFile.exists()) {
-        destinationFile.delete()
-      }
+      downloadTarget?.cleanup?.invoke()
       throw error
     } finally {
       connection.disconnect()
     }
   }
 
-  private fun resolveDownloadTarget(
+  private fun resolveDownloadTargetPath(
     destinationPath: String,
     explicitMimeType: String?,
     suggestedFilename: String?,
-    responseMimeType: String?
-  ): File {
+    responseMimeType: String?,
+    saveToDownloads: Boolean
+  ): String {
+    if (saveToDownloads) {
+      return resolveDownloadFilename(
+        destinationPath = destinationPath,
+        explicitMimeType = explicitMimeType,
+        suggestedFilename = suggestedFilename,
+        responseMimeType = responseMimeType
+      )
+    }
+
+    if (isContentUri(destinationPath)) {
+      return destinationPath
+    }
+
     val destinationFile = File(destinationPath)
     if (destinationFile.extension.isNotEmpty()) {
-      return destinationFile
+      return destinationFile.absolutePath
     }
 
     val inferredExtension = extensionFromMimeType(explicitMimeType)
@@ -306,28 +379,163 @@ class ReactNativeFilesystemModule : Module() {
       ?: extensionFromMimeType(responseMimeType)
 
     if (inferredExtension.isNullOrEmpty()) {
-      return destinationFile
+      return destinationFile.absolutePath
     }
 
-    return File(destinationFile.parentFile, "${destinationFile.name}.$inferredExtension")
+    return File(destinationFile.parentFile, "${destinationFile.name}.$inferredExtension").absolutePath
+  }
+
+  private fun resolveDownloadFilename(
+    destinationPath: String,
+    explicitMimeType: String?,
+    suggestedFilename: String?,
+    responseMimeType: String?
+  ): String {
+    val rawFilename = File(destinationPath).name.ifEmpty {
+      extractFilenameFromContentDisposition(suggestedFilename)
+        ?: "download"
+    }
+
+    if (rawFilename.substringAfterLast('.', "").isNotEmpty()) {
+      return rawFilename
+    }
+
+    val inferredExtension = extensionFromMimeType(explicitMimeType)
+      ?: extensionFromContentDisposition(suggestedFilename)
+      ?: extensionFromMimeType(responseMimeType)
+
+    return if (inferredExtension.isNullOrEmpty()) {
+      rawFilename
+    } else {
+      "$rawFilename.$inferredExtension"
+    }
+  }
+
+  private fun openDownloadTarget(
+    resolvedDestinationPath: String,
+    mimeType: String?,
+    saveToDownloads: Boolean
+  ): DownloadTarget {
+    if (saveToDownloads) {
+      return openDownloadsTarget(resolvedDestinationPath, mimeType)
+    }
+
+    if (isContentUri(resolvedDestinationPath)) {
+      val uri = Uri.parse(resolvedDestinationPath)
+      val outputStream = context.contentResolver.openOutputStream(uri, "w")
+        ?: throw IOException("Unable to open content URI for writing: $resolvedDestinationPath")
+
+      return DownloadTarget(
+        path = resolvedDestinationPath,
+        outputStream = outputStream,
+        cleanup = { context.contentResolver.delete(uri, null, null) }
+      )
+    }
+
+    val destinationFile = File(resolvedDestinationPath)
+    destinationFile.parentFile?.mkdirs()
+    return DownloadTarget(
+      path = destinationFile.absolutePath,
+      outputStream = FileOutputStream(destinationFile),
+      cleanup = {
+        if (destinationFile.exists()) {
+          destinationFile.delete()
+        }
+      }
+    )
+  }
+
+  private fun openDownloadsTarget(filename: String, mimeType: String?): DownloadTarget {
+    val resolvedMimeType = sanitizeMimeType(mimeType) ?: "application/octet-stream"
+
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+      val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
+        put(MediaStore.MediaColumns.MIME_TYPE, resolvedMimeType)
+        put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+      }
+
+      val uri = context.contentResolver.insert(
+        MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+        values
+      ) ?: throw IOException("Unable to create a Downloads entry for $filename")
+
+      val outputStream = context.contentResolver.openOutputStream(uri, "w")
+        ?: run {
+          context.contentResolver.delete(uri, null, null)
+          throw IOException("Unable to open a Downloads output stream for $filename")
+        }
+
+      return DownloadTarget(
+        path = uri.toString(),
+        outputStream = outputStream,
+        cleanup = { context.contentResolver.delete(uri, null, null) }
+      )
+    }
+
+    ensureLegacyExternalStoragePermission(EnumSet.of(Permission.WRITE))
+    @Suppress("DEPRECATION")
+    val downloadsDirectory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+    val file = File(downloadsDirectory, filename)
+    file.parentFile?.mkdirs()
+    return DownloadTarget(
+      path = file.absolutePath,
+      outputStream = FileOutputStream(file),
+      cleanup = {
+        if (file.exists()) {
+          file.delete()
+        }
+      }
+    )
+  }
+
+  private fun emitDownloadProgress(
+    url: String,
+    destinationPath: String,
+    progressId: String?,
+    bytesWritten: Long,
+    contentLength: Long?
+  ) {
+    val progress = if (contentLength != null && contentLength > 0L) {
+      bytesWritten.toDouble() / contentLength.toDouble()
+    } else {
+      null
+    }
+
+    sendEvent(
+      "downloadProgress",
+      mapOf(
+        "bytesWritten" to bytesWritten,
+        "contentLength" to contentLength,
+        "destinationPath" to destinationPath,
+        "progress" to progress,
+        "progressId" to progressId,
+        "url" to url
+      )
+    )
   }
 
   private fun extensionFromContentDisposition(contentDisposition: String?): String? {
-    val filename = contentDisposition
+    val filename = extractFilenameFromContentDisposition(contentDisposition) ?: return null
+    val extension = filename.substringAfterLast('.', "")
+    return extension.ifEmpty { null }
+  }
+
+  private fun extractFilenameFromContentDisposition(contentDisposition: String?): String? {
+    return contentDisposition
       ?.split(';')
       ?.map { it.trim() }
       ?.firstOrNull { it.startsWith("filename=", ignoreCase = true) }
       ?.substringAfter('=')
       ?.trim('"')
-      ?: return null
-
-    val extension = filename.substringAfterLast('.', "")
-    return extension.ifEmpty { null }
   }
 
   private fun extensionFromMimeType(mimeType: String?): String? {
-    val sanitizedMimeType = mimeType?.substringBefore(';')?.trim()?.lowercase()
-    return sanitizedMimeType?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+    return sanitizeMimeType(mimeType)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+  }
+
+  private fun sanitizeMimeType(mimeType: String?): String? {
+    return mimeType?.substringBefore(';')?.trim()?.lowercase()?.ifEmpty { null }
   }
 
   private fun isContentUri(path: String): Boolean {

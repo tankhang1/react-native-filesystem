@@ -21,6 +21,7 @@ export type DemoSharedProps = {
   documentsDirectory: string;
   downloadsResult: string;
   downloadResult: string;
+  downloadProgress: string;
   saveToFilesButtonTitle: string;
   setFilePath: (value: string) => void;
   setDirectoryPath: (value: string) => void;
@@ -32,6 +33,7 @@ export type DemoSharedProps = {
   setStatResult: (value: string) => void;
   setDownloadsResult: (value: string) => void;
   setDownloadResult: (value: string) => void;
+  setDownloadProgress: (value: string) => void;
   applyDocumentsDirectory: () => Promise<void>;
   applyCustomDirectory: () => void;
   runAction: (actionName: string, action: () => Promise<void>) => Promise<void>;

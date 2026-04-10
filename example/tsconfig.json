@@ -3,8 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "react-native-filesystem": ["../src/index"],
-      "react-native-filesystem/*": ["../src/*"]
+      "react-native-simple-fs": ["../src/index"],
+      "react-native-simple-fs/*": ["../src/*"]
     }
   }
 }

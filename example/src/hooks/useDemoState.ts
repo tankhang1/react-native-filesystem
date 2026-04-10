@@ -4,7 +4,7 @@ import ReactNativeFilesystem, {
   joinReactNativeFilesystemPath,
   resolveReactNativeFilesystemDirectory,
   resolveReactNativeFilesystemFilePath,
-} from 'react-native-filesystem';
+} from 'react-native-simple-fs';
 import {
   DEFAULT_CONTENTS,
   DEFAULT_DOWNLOAD_URL,
@@ -15,6 +15,15 @@ import {
   TOAST_DURATION_MS,
 } from '../constants';
 import { createCustomDirectory } from '../utils';
+
+type ReactNativeFilesystemDownloadProgressEvent = {
+  bytesWritten: number;
+  contentLength: number | null;
+  destinationPath: string;
+  progress: number | null;
+  progressId: string | null;
+  url: string;
+};
 
 export function useDemoState() {
   const [filePath, setFilePath] = useState(FALLBACK_FILE_PATH);
@@ -29,6 +38,7 @@ export function useDemoState() {
   const [documentsDirectory, setDocumentsDirectory] = useState('not loaded');
   const [downloadsResult, setDownloadsResult] = useState('none');
   const [downloadResult, setDownloadResult] = useState('none');
+  const [downloadProgress, setDownloadProgress] = useState('idle');
   const [toastMessage, setToastMessage] = useState('');
   const saveToFilesButtonTitle =
     Platform.OS === 'android' ? 'Write to downloads' : 'Save to Files';
@@ -60,6 +70,25 @@ export function useDemoState() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const subscription = (ReactNativeFilesystem as any).addListener(
+      'downloadProgress',
+      (event: ReactNativeFilesystemDownloadProgressEvent) => {
+        const percent =
+          event.progress == null ? 'unknown' : `${Math.round(event.progress * 100)}%`;
+        const totalBytes =
+          event.contentLength == null ? 'unknown total' : `${event.contentLength} bytes`;
+        setDownloadProgress(
+          `${percent} (${event.bytesWritten}/${totalBytes}) -> ${event.destinationPath}`
+        );
+      }
+    );
+
+    return () => {
+      subscription.remove();
     };
   }, []);
 
@@ -136,6 +165,7 @@ export function useDemoState() {
       documentsDirectory,
       downloadsResult,
       downloadResult,
+      downloadProgress,
       saveToFilesButtonTitle,
       setFilePath,
       setDirectoryPath,
@@ -147,6 +177,7 @@ export function useDemoState() {
       setStatResult,
       setDownloadsResult,
       setDownloadResult,
+      setDownloadProgress,
       applyDocumentsDirectory,
       applyCustomDirectory,
       runAction,

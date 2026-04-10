@@ -147,7 +147,8 @@ const destinationPath = await resolveReactNativeFilesystemFilePath(
 ```ts
 const result = await ReactNativeFilesystem.downloadFile(
   'https://www.w3.org/TR/PNG/iso_8859-1.txt',
-  destinationPath
+  destinationPath,
+  { onProgressIntervalMs: 150 }
 );
 ```
 
@@ -228,6 +229,8 @@ Platform behavior:
 
 - Android: writes directly to Downloads
 - iOS: opens the Files picker and returns the chosen destination path
+
+For remote files on Android, `downloadFile()` can also write straight to Downloads by passing `saveToDownloads: true`.
 
 ### Full export example
 
@@ -535,7 +538,10 @@ import ReactNativeFilesystem, {
 const result = await ReactNativeFilesystem.downloadFile(
   'https://pdfobject.com/pdf/sample.pdf',
   filePath,
-  { mimeType: ReactNativeFilesystemCommonMimeTypes.Pdf }
+  {
+    mimeType: ReactNativeFilesystemCommonMimeTypes.Pdf,
+    onProgressIntervalMs: 150,
+  }
 );
 ```
 
@@ -547,7 +553,34 @@ Behavior:
 - if `destinationPath` has no extension, the module tries to infer one from `options.mimeType`, the server's suggested filename, or the response MIME type
 - works for text and binary downloads
 - for binary files, use the returned `result.path` and do not pass the file into `readFile()`
+- on Android, pass `{ saveToDownloads: true }` to save the remote file in the public Downloads folder
+- emits `downloadProgress` events when `onProgressIntervalMs` is provided
 - returns `{ path, bytesWritten, statusCode }`
+
+Download options:
+
+- `mimeType?: string`
+- `onProgressIntervalMs?: number`
+- `progressId?: string`
+- `saveToDownloads?: boolean` Android only
+
+Progress events:
+
+```ts
+const subscription = ReactNativeFilesystem.addListener(
+  'downloadProgress',
+  (event) => {
+    console.log(event.progress, event.bytesWritten, event.destinationPath);
+  }
+);
+
+const result = await ReactNativeFilesystem.downloadFile(url, filePath, {
+  onProgressIntervalMs: 150,
+  progressId: 'my-download',
+});
+
+subscription.remove();
+```
 
 ### `writeFileToDownloads(filename, contents, mimeType?)`
 

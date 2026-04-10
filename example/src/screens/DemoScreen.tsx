@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import ReactNativeFilesystem, {
   ReactNativeFilesystemView,
-} from "react-native-filesystem";
+} from "react-native-simple-fs";
 import {
   ActionSection,
   ActionTile,
@@ -42,6 +42,7 @@ export function DemoScreen(props: DemoScreenProps) {
     documentsDirectory,
     downloadsResult,
     downloadResult,
+    downloadProgress,
     saveToFilesButtonTitle,
     setFilePath,
     setDirectoryPath,
@@ -53,6 +54,7 @@ export function DemoScreen(props: DemoScreenProps) {
     setStatResult,
     setDownloadsResult,
     setDownloadResult,
+    setDownloadProgress,
     applyDocumentsDirectory,
     applyCustomDirectory,
     runAction,
@@ -69,6 +71,8 @@ export function DemoScreen(props: DemoScreenProps) {
   const showRemoteActions = isOverview || mode === "remote";
   const showResults = mode === "results";
   const showPreview = isOverview || mode === "preview";
+  const downloadTargetPath =
+    Platform.OS === "android" ? filePath.split("/").pop() || "downloaded-file" : filePath;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -375,12 +379,21 @@ export function DemoScreen(props: DemoScreenProps) {
                     caption="Fetch a remote file into the current path."
                     onPress={() =>
                       runAction("downloadFile", async () => {
+                        setDownloadProgress("starting");
                         const result = await ReactNativeFilesystem.downloadFile(
                           downloadUrl,
-                          filePath,
+                          downloadTargetPath,
+                          {
+                            onProgressIntervalMs: 150,
+                            progressId: "example-download",
+                            saveToDownloads: Platform.OS === "android",
+                          } as any
                         );
                         setDownloadResult(JSON.stringify(result));
-                        if (isTextReadableFile(result.path)) {
+                        if (Platform.OS === "android") {
+                          setDownloadsResult(result.path);
+                        }
+                        if (Platform.OS !== "android" && isTextReadableFile(result.path)) {
                           setReadResult(
                             await ReactNativeFilesystem.readFile(result.path),
                           );
@@ -404,7 +417,6 @@ export function DemoScreen(props: DemoScreenProps) {
                             "text/plain",
                           );
                         setDownloadsResult(result);
-                        setFilePath(result);
                       })
                     }
                   />
@@ -415,6 +427,11 @@ export function DemoScreen(props: DemoScreenProps) {
                   value={downloadResult}
                   accent="#1e5b85"
                   textTestID="download-result"
+                />
+                <ResultPanel
+                  title="Download progress"
+                  value={downloadProgress}
+                  accent="#0f6262"
                 />
                 <ResultPanel
                   title="Downloads result"
@@ -446,6 +463,11 @@ export function DemoScreen(props: DemoScreenProps) {
               value={downloadResult}
               accent="#1e5b85"
               textTestID="download-result"
+            />
+            <ResultPanel
+              title="Download progress"
+              value={downloadProgress}
+              accent="#0f6262"
             />
             <ResultPanel
               title="Downloads result"

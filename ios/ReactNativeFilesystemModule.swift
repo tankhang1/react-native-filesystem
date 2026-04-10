@@ -5,6 +5,10 @@ import UniformTypeIdentifiers
 
 public class ReactNativeFilesystemModule: Module {
   private lazy var fileExportHandler = IOSFileExportHandler(module: self)
+  private var activeDownloadDelegates: [Int: IOSDownloadTaskDelegate] = [:]
+  private let activeDownloadDelegatesQueue = DispatchQueue(
+    label: "ReactNativeFilesystem.activeDownloadDelegates"
+  )
 
   // Each module class must implement the definition function. The definition consists of components
   // that describes the module's functionality and behavior.
@@ -14,6 +18,8 @@ public class ReactNativeFilesystemModule: Module {
     // Can be inferred from module's class name, but it's recommended to set it explicitly for clarity.
     // The module will be accessible from `requireNativeModule('ReactNativeFilesystem')` in JavaScript.
     Name("ReactNativeFilesystem")
+
+    Events("downloadProgress")
 
     AsyncFunction("getDocumentsDirectory") { () -> String in
       guard let path = self.appContext?.config.documentDirectory?.path else {
@@ -56,16 +62,25 @@ public class ReactNativeFilesystemModule: Module {
     }
 
     AsyncFunction("downloadFile") { (urlString: String, destinationPath: String, options: [String: Any]?) async throws -> [String: Any] in
-      let sourceURL = try self.createDownloadSourceURL(from: urlString)
-      let (temporaryURL, response) = try await URLSession.shared.download(from: sourceURL)
-
-      guard let httpResponse = response as? HTTPURLResponse else {
+      if (options?["saveToDownloads"] as? Bool) == true {
         throw NSError(
           domain: "ReactNativeFilesystem",
-          code: 500,
-          userInfo: [NSLocalizedDescriptionKey: "Expected an HTTP response for URL: \(urlString)"]
+          code: 400,
+          userInfo: [NSLocalizedDescriptionKey: "saveToDownloads is only supported on Android. Use writeFileToDownloads() on iOS."]
         )
       }
+
+      let sourceURL = try self.createDownloadSourceURL(from: urlString)
+      let (temporaryURL, response) = try await self.performDownload(
+        from: sourceURL,
+        urlString: urlString,
+        destinationPath: destinationPath,
+        explicitMimeType: options?["mimeType"] as? String,
+        progressId: options?["progressId"] as? String,
+        progressIntervalMs: (options?["onProgressIntervalMs"] as? NSNumber)?.intValue ?? 0
+      )
+
+      let httpResponse = response
 
       guard (200...299).contains(httpResponse.statusCode) else {
         throw NSError(
@@ -102,6 +117,14 @@ public class ReactNativeFilesystemModule: Module {
 
       let attributes = try FileManager.default.attributesOfItem(atPath: destinationURL.path)
       let bytesWritten = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+
+      self.emitDownloadProgress(
+        url: urlString,
+        destinationPath: destinationURL.path,
+        progressId: options?["progressId"] as? String,
+        bytesWritten: bytesWritten,
+        contentLength: response.expectedContentLength
+      )
 
       return [
         "path": destinationURL.path,
@@ -265,6 +288,58 @@ public class ReactNativeFilesystemModule: Module {
     try FileManager.default.copyItem(atPath: from, toPath: to)
   }
 
+  private func performDownload(
+    from sourceURL: URL,
+    urlString: String,
+    destinationPath: String,
+    explicitMimeType: String?,
+    progressId: String?,
+    progressIntervalMs: Int
+  ) async throws -> (URL, HTTPURLResponse) {
+    try await withCheckedThrowingContinuation { continuation in
+      let delegate = IOSDownloadTaskDelegate(
+        progressIntervalMs: progressIntervalMs,
+        onProgress: { [weak self] bytesWritten, contentLength, response in
+          guard let self else {
+            return
+          }
+
+          let resolvedDestinationPath = response.map {
+            self.resolveDownloadDestinationURL(
+              from: URL(fileURLWithPath: destinationPath),
+              response: $0,
+              explicitMimeType: explicitMimeType
+            ).path
+          } ?? destinationPath
+
+          self.emitDownloadProgress(
+            url: urlString,
+            destinationPath: resolvedDestinationPath,
+            progressId: progressId,
+            bytesWritten: bytesWritten,
+            contentLength: contentLength
+          )
+        },
+        onComplete: { [weak self] result, taskIdentifier in
+          self?.setActiveDownloadDelegate(nil, for: taskIdentifier)
+          continuation.resume(with: result)
+        }
+      )
+
+      let session = URLSession(
+        configuration: .default,
+        delegate: delegate,
+        delegateQueue: nil
+      )
+      delegate.session = session
+
+      let task = session.downloadTask(with: sourceURL)
+      delegate.taskIdentifier = task.taskIdentifier
+      self.setActiveDownloadDelegate(delegate, for: task.taskIdentifier)
+      task.resume()
+    }
+  }
+
   private func createDownloadSourceURL(from urlString: String) throws -> URL {
     guard let url = URL(string: urlString), let scheme = url.scheme?.lowercased() else {
       throw NSError(
@@ -356,11 +431,136 @@ public class ReactNativeFilesystemModule: Module {
 
     return UTType(mimeType: rawMimeType)
   }
+
+  private func emitDownloadProgress(
+    url: String,
+    destinationPath: String,
+    progressId: String?,
+    bytesWritten: Int64,
+    contentLength: Int64
+  ) {
+    let normalizedContentLength = contentLength >= 0 ? contentLength : nil
+    let progress: Double?
+    if let normalizedContentLength, normalizedContentLength > 0 {
+      progress = Double(bytesWritten) / Double(normalizedContentLength)
+    } else {
+      progress = nil
+    }
+
+    sendEvent("downloadProgress", [
+      "bytesWritten": bytesWritten,
+      "contentLength": normalizedContentLength,
+      "destinationPath": destinationPath,
+      "progress": progress,
+      "progressId": progressId,
+      "url": url
+    ])
+  }
+
+  private func setActiveDownloadDelegate(_ delegate: IOSDownloadTaskDelegate?, for taskIdentifier: Int) {
+    activeDownloadDelegatesQueue.sync {
+      activeDownloadDelegates[taskIdentifier] = delegate
+    }
+  }
 }
 
 private extension String {
   var nilIfEmpty: String? {
     isEmpty ? nil : self
+  }
+}
+
+private final class IOSDownloadTaskDelegate: NSObject, URLSessionDownloadDelegate {
+  var session: URLSession?
+  var taskIdentifier: Int = 0
+
+  private let progressIntervalMs: Int
+  private let onProgress: (Int64, Int64, HTTPURLResponse?) -> Void
+  private let onComplete: (Result<(URL, HTTPURLResponse), Error>, Int) -> Void
+  private var didComplete = false
+  private var lastProgressEventAt = Date.distantPast
+  private var temporaryURL: URL?
+
+  init(
+    progressIntervalMs: Int,
+    onProgress: @escaping (Int64, Int64, HTTPURLResponse?) -> Void,
+    onComplete: @escaping (Result<(URL, HTTPURLResponse), Error>, Int) -> Void
+  ) {
+    self.progressIntervalMs = progressIntervalMs
+    self.onProgress = onProgress
+    self.onComplete = onComplete
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    downloadTask: URLSessionDownloadTask,
+    didWriteData bytesWritten: Int64,
+    totalBytesWritten: Int64,
+    totalBytesExpectedToWrite: Int64
+  ) {
+    let shouldEmitProgress =
+      progressIntervalMs <= 0 ||
+      Date().timeIntervalSince(lastProgressEventAt) * 1000 >= Double(progressIntervalMs) ||
+      (totalBytesExpectedToWrite > 0 && totalBytesWritten >= totalBytesExpectedToWrite)
+
+    guard shouldEmitProgress else {
+      return
+    }
+
+    lastProgressEventAt = Date()
+    onProgress(totalBytesWritten, totalBytesExpectedToWrite, downloadTask.response as? HTTPURLResponse)
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    downloadTask: URLSessionDownloadTask,
+    didFinishDownloadingTo location: URL
+  ) {
+    temporaryURL = location
+  }
+
+  func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    guard !didComplete else {
+      return
+    }
+
+    didComplete = true
+    session.finishTasksAndInvalidate()
+
+    if let error {
+      onComplete(.failure(error), taskIdentifier)
+      return
+    }
+
+    guard let httpResponse = task.response as? HTTPURLResponse else {
+      onComplete(
+        .failure(
+          NSError(
+            domain: "ReactNativeFilesystem",
+            code: 500,
+            userInfo: [NSLocalizedDescriptionKey: "Expected an HTTP response for URLSession download."]
+          )
+        ),
+        taskIdentifier
+      )
+      return
+    }
+
+    guard let temporaryURL else {
+      onComplete(
+        .failure(
+          NSError(
+            domain: "ReactNativeFilesystem",
+            code: 500,
+            userInfo: [NSLocalizedDescriptionKey: "Download completed without a temporary file."]
+          )
+        ),
+        taskIdentifier
+      )
+      return
+    }
+
+    onComplete(.success((temporaryURL, httpResponse)), taskIdentifier)
   }
 }
 

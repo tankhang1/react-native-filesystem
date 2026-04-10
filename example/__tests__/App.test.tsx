@@ -107,7 +107,7 @@ jest.mock('@react-navigation/drawer', () => {
   };
 });
 
-jest.mock('react-native-filesystem', () => {
+jest.mock('react-native-simple-fs', () => {
   const React = require('react');
   const DOCUMENTS_KIND = 'documents';
   const CUSTOM_KIND = 'custom';

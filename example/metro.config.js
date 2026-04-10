@@ -19,7 +19,7 @@ config.resolver.nodeModulesPaths = [
 ];
 
 config.resolver.extraNodeModules = {
-  'react-native-filesystem': '..',
+  'react-native-simple-fs': '..',
 };
 
 config.watchFolders = [path.resolve(__dirname, '..')];

@@ -6,7 +6,7 @@ module.exports = async (env, argv) => {
     {
       ...env,
       babel: {
-        dangerouslyAddModulePathsToTranspile: ['react-native-filesystem'],
+        dangerouslyAddModulePathsToTranspile: ['react-native-simple-fs'],
       },
     },
     argv

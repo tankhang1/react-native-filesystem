@@ -2,7 +2,7 @@ import {
   ReactNativeFilesystemCommonMimeTypes,
   ReactNativeFilesystemDirectoryKind,
   type ReactNativeFilesystemDirectoryDescriptor,
-} from 'react-native-filesystem';
+} from 'react-native-simple-fs';
 import type { DemoMode } from './types';
 
 const EXTENSION_TO_MIME_TYPE: Record<string, string> = {
@@ -94,7 +94,7 @@ export function createSnippet(filePath: string, downloadUrl: string) {
   const inferredMimeType = inferMimeType(filePath, downloadUrl);
 
   return [
-    "import ReactNativeFilesystem from 'react-native-filesystem';",
+    "import ReactNativeFilesystem from 'react-native-simple-fs';",
     '',
     'await ReactNativeFilesystem.downloadFile(',
     `  '${downloadUrl}',`,

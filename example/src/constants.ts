@@ -1,4 +1,4 @@
-import { ReactNativeFilesystemDirectoryKind, type ReactNativeFilesystemDirectoryDescriptor } from 'react-native-filesystem';
+import { ReactNativeFilesystemDirectoryKind, type ReactNativeFilesystemDirectoryDescriptor } from 'react-native-simple-fs';
 
 export const FALLBACK_FILE_PATH = '/tmp/react-native-filesystem/example.txt';
 export const FALLBACK_DIRECTORY_PATH = '/tmp/react-native-filesystem';
