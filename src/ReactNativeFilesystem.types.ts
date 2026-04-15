@@ -25,9 +25,12 @@ export type ReactNativeFilesystemDownloadProgressEvent = {
 };
 
 export type ReactNativeFilesystemDownloadOptions = {
+  connectTimeoutMs?: number;
+  headers?: Record<string, string>;
   mimeType?: string;
   onProgressIntervalMs?: number;
   progressId?: string;
+  readTimeoutMs?: number;
   saveToDownloads?: boolean;
 };
 

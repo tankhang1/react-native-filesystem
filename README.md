@@ -306,10 +306,15 @@ Downloads a remote file to a local path or platform-specific destination.
 
 | Property | Type | Required | Description |
 | --- | --- | --- | --- |
+| `connectTimeoutMs` | `number` | No | Connection timeout in milliseconds |
+| `headers` | `Record<string, string>` | No | Extra HTTP request headers |
 | `mimeType` | `string` | No | Explicit MIME type |
 | `onProgressIntervalMs` | `number` | No | Progress event interval in milliseconds |
 | `progressId` | `string` | No | Progress event correlation id |
+| `readTimeoutMs` | `number` | No | Read/request timeout in milliseconds |
 | `saveToDownloads` | `boolean` | No | Android only, write directly to Downloads |
+
+`connectTimeoutMs` defaults to `15000` and `readTimeoutMs` defaults to `30000`.
 
 #### Return value
 
@@ -329,9 +334,14 @@ const result = await ReactNativeFilesystem.downloadFile(
   'https://pdfobject.com/pdf/sample.pdf',
   destinationPath,
   {
+    headers: {
+      Authorization: 'Bearer <token>',
+    },
+    connectTimeoutMs: 10_000,
     mimeType: ReactNativeFilesystemCommonMimeTypes.Pdf,
     onProgressIntervalMs: 150,
     progressId: 'sample-pdf',
+    readTimeoutMs: 30_000,
   }
 );
 
@@ -767,7 +777,7 @@ The project is focused on staying small, practical, and Expo-friendly while cove
 
 - ~~add `appendFile(...)` for log files, incremental exports, and simple cache updates~~
 - ~~add binary-friendly read and write support such as `base64`~~
-- expand `downloadFile(...)` with options like request headers and timeouts
+- ~~expand `downloadFile(...)` with options like request headers and timeouts~~
 - add file hashing helpers such as `md5` or `sha256`
 - add `uploadFile(...)` with progress events and cancellation
 - improve Android `content://` and document picker interoperability

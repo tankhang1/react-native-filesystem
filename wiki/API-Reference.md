@@ -63,9 +63,14 @@ const result = await ReactNativeFilesystem.downloadFile(
   'https://pdfobject.com/pdf/sample.pdf',
   destinationPath,
   {
+    headers: {
+      Authorization: 'Bearer <token>',
+    },
+    connectTimeoutMs: 10_000,
     mimeType: ReactNativeFilesystemCommonMimeTypes.Pdf,
     onProgressIntervalMs: 150,
     progressId: 'sample-pdf',
+    readTimeoutMs: 30_000,
   }
 );
 ```
@@ -78,12 +83,17 @@ Return value:
 
 Options:
 
+- `connectTimeoutMs`
+- `headers`
 - `mimeType`
 - `onProgressIntervalMs`
 - `progressId`
+- `readTimeoutMs`
 - `saveToDownloads`
 
 Note: `saveToDownloads` is Android-only.
+
+Defaults: `connectTimeoutMs` is `15000` and `readTimeoutMs` is `30000`.
 
 ### `writeFileToDownloads(filename, contents, mimeType?)`
 

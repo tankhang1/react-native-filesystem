@@ -150,11 +150,23 @@ public class ReactNativeFilesystemModule: Module {
       }
 
       let sourceURL = try self.createDownloadSourceURL(from: urlString)
+      let headers = self.normalizeHTTPHeaders(from: options?["headers"])
+      let connectTimeoutMs =
+        ((options?["connectTimeoutMs"] as? NSNumber)?.doubleValue ?? 15_000) > 0
+          ? ((options?["connectTimeoutMs"] as? NSNumber)?.doubleValue ?? 15_000)
+          : 15_000
+      let readTimeoutMs =
+        ((options?["readTimeoutMs"] as? NSNumber)?.doubleValue ?? 30_000) > 0
+          ? ((options?["readTimeoutMs"] as? NSNumber)?.doubleValue ?? 30_000)
+          : 30_000
       let (temporaryURL, response) = try await self.performDownload(
         from: sourceURL,
         urlString: urlString,
         destinationPath: destinationPath,
+        headers: headers,
         explicitMimeType: options?["mimeType"] as? String,
+        connectTimeoutMs: connectTimeoutMs,
+        readTimeoutMs: readTimeoutMs,
         progressId: options?["progressId"] as? String,
         progressIntervalMs: (options?["onProgressIntervalMs"] as? NSNumber)?.intValue ?? 0
       )
@@ -417,7 +429,10 @@ public class ReactNativeFilesystemModule: Module {
     from sourceURL: URL,
     urlString: String,
     destinationPath: String,
+    headers: [String: String],
     explicitMimeType: String?,
+    connectTimeoutMs: Double,
+    readTimeoutMs: Double,
     progressId: String?,
     progressIntervalMs: Int
   ) async throws -> (URL, HTTPURLResponse) {
@@ -451,14 +466,24 @@ public class ReactNativeFilesystemModule: Module {
         }
       )
 
+      let configuration = URLSessionConfiguration.default
+      configuration.timeoutIntervalForRequest = max(readTimeoutMs, 0) / 1000
+      configuration.timeoutIntervalForResource = max(max(connectTimeoutMs, readTimeoutMs), 0) / 1000
+
       let session = URLSession(
-        configuration: .default,
+        configuration: configuration,
         delegate: delegate,
         delegateQueue: nil
       )
       delegate.session = session
 
-      let task = session.downloadTask(with: sourceURL)
+      var request = URLRequest(url: sourceURL)
+      request.timeoutInterval = max(connectTimeoutMs, 0) / 1000
+      headers.forEach { key, value in
+        request.setValue(value, forHTTPHeaderField: key)
+      }
+
+      let task = session.downloadTask(with: request)
       delegate.taskIdentifier = task.taskIdentifier
       self.setActiveDownloadDelegate(delegate, for: task.taskIdentifier)
       task.resume()
@@ -483,6 +508,28 @@ public class ReactNativeFilesystemModule: Module {
     }
 
     return url
+  }
+
+  private func normalizeHTTPHeaders(from rawHeaders: Any?) -> [String: String] {
+    guard let rawHeaders = rawHeaders as? [String: Any] else {
+      return [:]
+    }
+
+    var normalizedHeaders: [String: String] = [:]
+    normalizedHeaders.reserveCapacity(rawHeaders.count)
+
+    for (key, value) in rawHeaders {
+      let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !trimmedKey.isEmpty else {
+        continue
+      }
+
+      if let stringValue = value as? String {
+        normalizedHeaders[trimmedKey] = stringValue
+      }
+    }
+
+    return normalizedHeaders
   }
 
   private func ensurePhotoLibraryAccess(level: PHAccessLevel) async throws {

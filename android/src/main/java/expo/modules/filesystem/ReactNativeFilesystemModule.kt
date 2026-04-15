@@ -168,10 +168,33 @@ class ReactNativeFilesystemModule : Module() {
         validateFileAccess(destinationPath, Permission.WRITE)
       }
 
+      val headers =
+        (options?.get("headers") as? Map<*, *>)
+          ?.entries
+          ?.mapNotNull { (key, value) ->
+            val headerName = key as? String
+            val headerValue = value as? String
+            if (headerName.isNullOrEmpty() || headerValue == null) {
+              null
+            } else {
+              headerName to headerValue
+            }
+          }
+          ?.toMap()
+          ?: emptyMap()
+
+      val connectTimeoutMs =
+        ((options?.get("connectTimeoutMs") as? Number)?.toInt() ?: 15000).takeIf { it > 0 } ?: 15000
+      val readTimeoutMs =
+        ((options?.get("readTimeoutMs") as? Number)?.toInt() ?: 30000).takeIf { it > 0 } ?: 30000
+
       downloadFile(
         url = url,
         destinationPath = destinationPath,
+        headers = headers,
         mimeType = options?.get("mimeType") as? String,
+        connectTimeoutMs = connectTimeoutMs,
+        readTimeoutMs = readTimeoutMs,
         saveToDownloads = saveToDownloads,
         progressId = options?.get("progressId") as? String,
         onProgressIntervalMs = (options?.get("onProgressIntervalMs") as? Number)?.toLong() ?: 0L
@@ -345,7 +368,10 @@ class ReactNativeFilesystemModule : Module() {
   private fun downloadFile(
     url: String,
     destinationPath: String,
+    headers: Map<String, String>,
     mimeType: String?,
+    connectTimeoutMs: Int,
+    readTimeoutMs: Int,
     saveToDownloads: Boolean,
     progressId: String?,
     onProgressIntervalMs: Long
@@ -365,8 +391,11 @@ class ReactNativeFilesystemModule : Module() {
       ?: throw IOException("Unable to open HTTP connection for URL: $url")
 
     connection.instanceFollowRedirects = true
-    connection.connectTimeout = 15000
-    connection.readTimeout = 30000
+    connection.connectTimeout = connectTimeoutMs
+    connection.readTimeout = readTimeoutMs
+    headers.forEach { (name, value) ->
+      connection.setRequestProperty(name, value)
+    }
     var downloadTarget: DownloadTarget? = null
 
     try {
