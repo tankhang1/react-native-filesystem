@@ -135,7 +135,7 @@ When adding or changing filesystem methods:
 
 - Update [src/ReactNativeFilesystemModule.ts](/Users/khang/Documents/Nexa/react-native-filesystem/src/ReactNativeFilesystemModule.ts)
 - Update [src/ReactNativeFilesystem.types.ts](/Users/khang/Documents/Nexa/react-native-filesystem/src/ReactNativeFilesystem.types.ts) if return types or payloads change
-- Keep [ios/ReactNativeFilesystemModule.swift](/Users/khang/Documents/Nexa/react-native-filesystem/ios/ReactNativeFilesystemModule.swift) and [android/src/main/java/expo/modules/filesystem/ReactNativeFilesystemModule.kt](/Users/khang/Documents/Nexa/react-native-filesystem/android/src/main/java/expo/modules/filesystem/ReactNativeFilesystemModule.kt) behavior aligned
+- Keep [ios/ReactNativeFilesystemModule.swift](/Users/khang/Documents/Nexa/react-native-filesystem/ios/ReactNativeFilesystemModule.swift) and [android/src/main/java/com/tankhang1/simplefs/ReactNativeFilesystemModule.kt](/Users/khang/Documents/Nexa/react-native-filesystem/android/src/main/java/com/tankhang1/simplefs/ReactNativeFilesystemModule.kt) behavior aligned
 - Document any unsupported web behavior in [src/ReactNativeFilesystemModule.web.ts](/Users/khang/Documents/Nexa/react-native-filesystem/src/ReactNativeFilesystemModule.web.ts)
 
 ### API Naming Stability

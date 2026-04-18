@@ -4,6 +4,6 @@
     "modules": ["ReactNativeFilesystemModule"]
   },
   "android": {
-    "modules": ["expo.modules.filesystem.ReactNativeFilesystemModule"]
+    "modules": ["com.tankhang1.simplefs.ReactNativeFilesystemModule"]
   }
 }

@@ -1,4 +1,4 @@
-package expo.modules.filesystem
+package com.tankhang1.simplefs
 
 import android.content.Context
 import android.webkit.WebView

@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "expo.modules.filesystem.example",
+      "bundleIdentifier": "com.tankhang1.simplefsexample",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "This demo reads recent images from your photo library.",
         "NSPhotoLibraryAddUsageDescription": "This demo saves downloaded images into your photo library."
@@ -27,7 +27,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "expo.modules.filesystem.example"
+      "package": "com.tankhang1.simplefsexample"
     },
     "web": {
       "favicon": "./assets/favicon.png"
